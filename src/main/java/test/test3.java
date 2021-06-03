@@ -9,6 +9,7 @@ public class test3 {
 		  System.out.println(res+"test"+"".best);
 		String res="a";
 		 res = res+"\n"+s.trim();
+		 System.out.println(res);
 abac
 pqr
 	}
