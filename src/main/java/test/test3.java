@@ -7,6 +7,8 @@ public class test3 {
 		String res="a";
 		 res = res+"\n"+s.trim();
 		 System.out.println(res);
+abac
+pqr
 	}
 
 }
