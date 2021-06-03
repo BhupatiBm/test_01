@@ -1,5 +1,6 @@
 package com.intellicentrics.choreography.notification.util;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.Maps;
 import com.intellicentrics.choreography.notification.email.EsbEmailClient;
 import com.intellicentrics.choreography.notification.messaging.enums.EmailMessageType;
@@ -11,6 +12,7 @@ import com.intellicentrics.choreography.notification.model.jpa.AppointmentPartic
 import com.intellicentrics.choreography.notification.model.jpa.CalendarEntity;
 import com.intellicentrics.choreography.notification.sync.service.common.JPortalService;
 import com.intellicentrics.choreography.notification.sync.service.common.ReptraxUserProfileService;
+import com.intellicentrics.choreography.notification.sync.service.common.Wso2Service;
 import com.intellicentrics.common.base.exception.OperationFailedException;
 import com.intellicentrics.common.eventdefinition.model.v1.calendar.AppointmentParticipantV1;
 import com.intellicentrics.common.eventdefinition.model.v1.calendar.AppointmentStatus;
@@ -40,6 +42,8 @@ public class EmailSenderUtil {
     private static final Logger LOGGER = LoggerFactory.getLogger(EmailSenderUtil.class);
     private final String EMAIL = "EMAIL_ADDRESS";
     private static final String LOCATION_EXTERNAL_ID_TYPE = "VIRTUAL_MEETING_URL";
+    private static final String WSO2_EMAILS_FIELD="emails";
+    private static final String WSO2_VALUE_FIELD="value";
 
     @Autowired
     protected EsbEmailClient esbEmailClient;
@@ -49,6 +53,9 @@ public class EmailSenderUtil {
 
     @Autowired
     private ReptraxUserProfileService reptraxUserProfileService;
+
+    @Autowired
+    private Wso2Service wso2Service;
 
     private NameParser nameParser = new NameParser();
     private SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
@@ -75,6 +82,7 @@ public class EmailSenderUtil {
                     	LOGGER.warn("Email not found for user: "+ participant.getParticipantName() + " " + participant.getParticipantExternalId() + " " + participant.getParticipantExternalIdType());
                     	continue;
                     }
+                    emailProps.setEmailAddress(userEmail);
                     LOGGER.info("Email found for user: " + participant.getParticipantName() + " " + emailProps.getEmailAddress());
                     emailProps.setParticipantName(participant.getParticipantName());
 
@@ -93,7 +101,6 @@ public class EmailSenderUtil {
                         emailProps.setCommentHistory(appointment.getNotes().stream().map(appointmentNoteV1 ->
                                 appointmentNoteV1.getSenderName() + ": " + appointmentNoteV1.getNote()).collect(Collectors.joining("<br>")));
                     }
-
                     if (!CollectionUtils.isEmpty(appointment.getParticipants())) {
                         emailProps.setParticipants(
                                 appointment.getParticipants().stream().filter(appointmentParticipantV1 -> !participant.getParticipantName()
@@ -332,8 +339,7 @@ public class EmailSenderUtil {
             Boolean sent = esbEmailClient.sendEmail(emailProps.getMessageType(), templateProperties);
             return sent;
         }
-
-        public String findEmail( AppointmentParticipantV1 participant ){
+        private String findEmail( AppointmentParticipantV1 participant ){
                 String email = new String();
                 try {
                         LOGGER.info("Retrieving email for " + participant.getParticipantExternalIdType());
@@ -344,6 +350,14 @@ public class EmailSenderUtil {
                         if(participant.getParticipantExternalIdType().equals(GroupMemberExternalIdType.INDIVIDUAL_ID.name())){
                                 User user = jPortalService.getIndividualEmail(participant.getParticipantExternalId());
                                 email = !user.getEmail().isEmpty() ? user.getEmail() : "";
+                        }
+                        if (participant.getParticipantExternalIdType().equals(GroupMemberExternalIdType.WSO2_USER_ID.name())) {
+                        	JsonNode userDetail = wso2Service.getUserDetailById(participant.getParticipantExternalId());
+                        	email = findWso2UserEmail(userDetail);
+                        }
+                        if (participant.getParticipantExternalIdType().equals(GroupMemberExternalIdType.WSO2_ID.name())) {
+                        	JsonNode userDetail = wso2Service.getUserDetailByUserName(participant.getParticipantExternalId());
+                        	email = findWso2UserEmail(userDetail);
                         }
                         if(participant.getParticipantExternalIdType().equals(EMAIL)){
                                 email = participant.getParticipantExternalId();
@@ -378,5 +392,15 @@ public class EmailSenderUtil {
                 }
                 LOGGER.info("Information retrieved " + userInfoResponse);
                 return userInfoResponse;
+        }
+        private String findWso2UserEmail(JsonNode userDetail) {
+        	String emailId="";
+        	int size= userDetail.get(WSO2_EMAILS_FIELD).size();
+        	JsonNode email = userDetail.get(WSO2_EMAILS_FIELD).get(size-1);
+        	if(email.has(WSO2_VALUE_FIELD))
+        		emailId=email.get(WSO2_VALUE_FIELD).toString();
+        	else
+        		emailId=email.toString();
+        	return emailId;
         }
 }
