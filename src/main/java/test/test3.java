@@ -6,10 +6,11 @@ public class test3 {
 		String s="< b >  ";
 		String res="a";
 		 res = res+"\n"+s.trim();
-		 System.out.println(res+"test"+"".best);
+		  System.out.println(res+"test"+"".best);
 		String res="a";
 		 res = res+"\n"+s.trim();
-
+abac
+pqr
 	}
 
 }
